@@ -1,6 +1,31 @@
 import { PostModel } from "../generated/prisma/models";
 import { prisma } from "../prisma";
-import { FeedSort, Post } from "../types";
+import { FeedSort, Post, User } from "../types";
+
+export async function batchAuthorIds(
+  authorIds: string[],
+): Promise<Map<string, User>> {
+  const unique = [...new Set(authorIds)];
+  if(unique.length === 0) return new Map();
+
+  const rows = await prisma.userProfile.findMany({
+    where: { id: {in: unique} }
+  })
+
+  const result = new Map<string, User>();
+
+  for (const row of rows) {
+    result.set(row.id, { id: row.id, username: row.username })
+  }
+
+  for (const id of unique) {
+    if(!result.has(id)) {
+      result.set(id, { id, username: `user_${id.slice(0,6)}` })
+    }
+  }
+
+  return result;
+}
 
 export type FeedPostRow = {
   post: Post;

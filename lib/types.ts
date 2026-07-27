@@ -5,6 +5,12 @@ export type User = {
     avatarUrl?: string
 }
 
+export type Tag = {
+    slug: string,
+    label: string,
+    hashColor: string
+}
+
 export type Post = {
     id: string,
     authorId: string,
