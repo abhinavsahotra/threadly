@@ -28,6 +28,7 @@ model Post {
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   postTags        PostTag[]
+  postComments    Comment[]
 
   @@map("posts")
 }
@@ -50,4 +51,27 @@ model PostTag {
 
   @@id([postId, tagSlug])
   @@map("post_tags")
+}
+
+model Comment {
+   id               String   @id @default(uuid()) @db.Uuid
+   postId           String   @map("post_id") @db.Uuid
+   authorId         String   @map("author_id")
+   parentId         String?   @map("parent_id")
+   body             String
+   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+   post             Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+   @@map("comments")
+}
+
+model Vote {
+  userId             String   @map("user_id")
+  targetType         String   @map("target_type")
+  targetId           String   @map("target_id") @db.Uuid
+  value              Int      @db.SmallInt
+
+  @@id([userId, targetId, targetType])
+  @@map("votes")
 }
