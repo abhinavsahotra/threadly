@@ -68,13 +68,20 @@ export async function listPostsSorted(
   if (ids.length === 0) return [];
 
   // if their is posts get (whether user voted the post, get the total sum of the posts, get total amount of comments from the post and also tags of the posts)
-  const [tagMap] = await Promise.all([tagForPosts(ids)]);
+  const [tagMap, ccMap, vsMap, uvMap] = await Promise.all([
+    tagForPosts(ids),
+    commentsCountsForPosts(ids),
+    voteSumsForPosts(ids),
+    userVotesForPosts(userId, ids)
+  ]);
 
   const mapped = postRows.map((row) => {
     const slugs = tagMap.get(row.id) ?? [];
+    const cc = ccMap.get(row.id) ?? 0;
+    const vs = vsMap.get(row.id) ?? 0;
     return {
-      post: mapPostRow(row, slugs, 65),
-      voteScore: 2,
+      post: mapPostRow(row, slugs, cc),
+      voteScore: vs,
       created: row.createdAt.getTime(),
       userVote: 1,
     };
@@ -135,6 +142,69 @@ async function tagForPosts(postIds: string[]) {
   return m;
 }
 
+async function commentsCountsForPosts(
+  postIds: string[]
+): Promise<Map<string, number>> {
+  if(postIds.length === 0) return new Map();
+
+  const rows = await prisma.comment.groupBy({
+    by: ["postId"],
+    where: { postId: { in: postIds }},
+    _count: { _all: true }
+  })
+
+  const m = new Map<string, number>();
+  for(const r of rows) {
+    m.set(r.postId, r._count._all)
+  }
+
+  return m;
+}
+
+async function voteSumsForPosts(
+  postIds: string[]
+): Promise<Map<string, number>>{
+  if(postIds.length === 0) return new Map();
+
+  const rows = await prisma.vote.groupBy({
+    by: ["targetId"],
+    where: {
+      targetType: "post",
+      targetId: { in: postIds }
+    },
+    _sum: { value: true }
+  })
+
+  const m = new Map<string,number>();
+  for(const r of rows){
+    m.set(r.targetId, Number(r._sum.value ?? 0));
+  }
+
+  return m;
+}
+
+async function userVotesForPosts(
+  userId: string | undefined,
+  postIds: string[]
+) {
+  const m = new Map<string, -1 | 0 | 1>();
+  if(!userId || postIds.length === 0) return m;
+
+  const rows = await prisma.vote.findMany({
+    where: {
+      userId,
+      targetType: "post",
+      targetId: { in: postIds }
+    },
+  });
+
+  for(const r of rows){
+    const v = r.value;
+    m.set(r.targetId, v === -1 || v === 1 ? v : 0);
+  }
+
+  return m;
+}
 function mapPostRow(
   row: PostModel,
   tagSlugs: string[],
