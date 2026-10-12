@@ -242,3 +242,59 @@ export async function getUserVote(
   
   return v === -1 || v === 1 ? v : 0;
 }
+
+export async function getPostById(id: string): Promise<Post|undefined>{
+  const row = await prisma.post.findUnique({ where:{ id } });
+  if(!row) return undefined;
+
+  const [tagMap, ccMap] = await Promise.all([tagForPosts([id]), commentsCountsForPosts([id])])
+
+  return mapPostRow(row,tagMap.get(id) ?? [], ccMap.get(id) ?? 0);
+}
+
+export async function getAuthorById(authorId: string): Promise<User>{
+  const row = await prisma.userProfile.findUnique({ where:{ id: authorId } });
+  return row 
+  ? {id: row.id, username: row.username}
+  : {id: authorId, username: `user_${authorId.slice(0,6)}`};
+}
+
+// export async function getCommentTree(
+//   postId: string,
+//   sessionUserId?: string,
+// ): Promise<EnrichedCommentNode[]> {
+//   const flat = await listCommentsForPost(postId);
+//   if (flat.length === 0) return [];
+//   const authorIds = [...new Set(flat.map((c) => c.authorId))];
+//   const authorMap = await batchAuthorsForIds(authorIds);
+
+//   const commentIds = flat.map((c) => c.id);
+//   const scoreMap = await batchCommentScores(commentIds);
+//   const voteMap = sessionUserId
+//     ? await batchUserVotesForComments(sessionUserId, commentIds)
+//     : new Map<string, -1 | 0 | 1>();
+
+//   const enriched = flat
+//     .map((c) => {
+//       const author = authorMap.get(c.authorId);
+//       if (!author) return null;
+
+//       return {
+//         ...c,
+//         author,
+//         score: scoreMap.get(c.id) ?? 0,
+//         userVote: (voteMap.get(c.id) ?? 0) as -1 | 0 | 1,
+//       };
+//     })
+//     .filter((x): x is NonNullable<typeof x> => x !== null);
+
+//   return nestCommentRows(enriched);
+// }
+
+export async function getPostScore(postId: string): Promise<number> {
+  const agg = await prisma.vote.aggregate({
+    where: { targetType: "post", targetId: postId },
+    _sum: { value: true },
+  });
+  return Number(agg._sum.value ?? 0);
+}
