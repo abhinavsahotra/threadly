@@ -22,3 +22,5 @@ export type Post = {
 }
 
 export type FeedSort = "hot" | "new" | "top"
+
+export type VoteTarget = "post" | "comment"

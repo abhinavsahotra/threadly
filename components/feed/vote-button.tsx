@@ -1,29 +1,72 @@
+"use client";
+
+import { votePostAction } from "@/lib/actions/post";
+import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
 
 type VoteTarget = "post" | "comment";
 
-
-
 export function VoteButtons({
-    target,
-    targetId,
-    score,
-    userVote
+  target,
+  targetId,
+  score,
+  userVote,
 }: {
-    target: VoteTarget,
-    targetId: string,
-    score: number,
-    userVote: -1 | 0 | 1
+  target: VoteTarget;
+  targetId: string;
+  score: number;
+  userVote: -1 | 0 | 1;
 }) {
-    return (
-        <div>
-            <button>
-                <ChevronUp />
-            </button>
-            <span>{score}</span>
-            <button>
-                <ChevronDown />
-            </button>
-        </div>
-    )
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+  const isPost = target === "post";
+  function vote(value: -1 | 1) {
+    if (isPost) {
+      startTransition(async () => {
+        await votePostAction(targetId, value);
+      });
+      router.refresh();
+    }
+  }
+
+  const iconClass = isPost ? "size-6" : "size-4";
+  const stackClass = isPost
+    ? "flex flex-col items-center gap-0.5 py-1 text-sm"
+    : "flex flex-col items-center gap-0 text-xs";
+  const scoreClass = isPost
+    ? "min-w-[2ch] text-center text-xs font-semibold tabular-nums"
+    : "min-w-[1.5ch] text-center font-medium tabular-nums";
+
+  return (
+    <div className={stackClass}>
+      <button
+        onClick={() => vote(1)}
+        disabled={pending}
+        className={cn(
+          "rounded p-0.5 transition-colors hover:bg-muted disabled:opacity-50",
+          userVote == 1
+            ? "text-upvote"
+            : "text-muted-foreground hover:text-upvote",
+        )}
+        aria-label={isPost ? "Upvote" : "Upvote comment"}
+      >
+        <ChevronUp className={iconClass}/>
+      </button>
+      <span
+       className={cn(
+        scoreClass,
+        userVote === 1 && "text-upvote",
+        userVote === -1 && "text-downvote"
+       )}
+      >{score}</span>
+      <button 
+            onClick={() => vote(-1)}
+            disabled={pending}
+        >
+        <ChevronDown className={iconClass}/>
+      </button>
+    </div>
+  );
 }

@@ -1,6 +1,6 @@
 import { PostModel } from "../generated/prisma/models";
 import { prisma } from "../prisma";
-import { FeedSort, Post, Tag, User } from "../types";
+import { FeedSort, Post, Tag, User, VoteTarget } from "../types";
 
 export async function listTags(): Promise<Tag[]> {
   const rows = await prisma.tag.findMany({
@@ -49,7 +49,7 @@ export async function listPostsSorted(
   sort: FeedSort,
   tagFilter: string | undefined,
   userId: string | undefined,
-) {
+): Promise<FeedPostRow[]> {
   // If a tag filter exists, only return posts that contain that tag.
   // Otherwise return all posts.
   const where = tagFilter
@@ -83,7 +83,7 @@ export async function listPostsSorted(
       post: mapPostRow(row, slugs, cc),
       voteScore: vs,
       created: row.createdAt.getTime(),
-      userVote: 1,
+      userVote: uvMap.get(row.id) ?? 0,
     };
   });
 
@@ -219,4 +219,26 @@ function mapPostRow(
     createdAt: row.createdAt.toISOString(),
     commentCount,
   };
+}
+
+export async function getUserVote(
+  userId: string | undefined,
+  type: VoteTarget,
+  targetId: string,
+): Promise<-1 | 0 | 1> {
+  if (!userId) return 0;
+
+  const row = await prisma.vote.findUnique({
+    where: {
+      userId_targetId_targetType: {
+        userId,
+        targetType: type,
+        targetId,
+      },
+    },
+  });
+
+  const v = row?.value;
+  
+  return v === -1 || v === 1 ? v : 0;
 }
