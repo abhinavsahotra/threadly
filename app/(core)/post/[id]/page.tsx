@@ -1,9 +1,12 @@
+// import { CommentThread } from "@/components/post/comment-thread";
 import { VoteButtons } from "@/components/feed/vote-button";
 import { CommentComposer } from "@/components/post/post-composer";
 import { Separator } from "@/components/ui/separator";
 import { getSessionUser } from "@/lib/auth";
 import {
   getAuthorById,
+    getCommentTree,
+//   getCommentTree,
   getPostById,
   getPostScore,
   getUserVote,
@@ -36,6 +39,7 @@ export default async function PostPage({
     ? tags.find((t) => t.slug === primarySlug)
     : undefined;
 
+  const commentTree = await getCommentTree(post.id, sessionUser?.id);
 
   return (
     <div className="flex gap-8">
@@ -121,6 +125,12 @@ export default async function PostPage({
               to join the discussion.
             </p>
           )}
+
+          {/* <CommentThread
+            tree={commentTree}
+            postAuthorId={post.authorId}
+            sessionUser={sessionUser}
+          /> */}
         </section>
       </div>
     </div>

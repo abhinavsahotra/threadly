@@ -1,6 +1,7 @@
+import { EnrichedCommentNode, nestCommentRows } from "../comment-tree";
 import { PostModel } from "../generated/prisma/models";
 import { prisma } from "../prisma";
-import { FeedSort, Post, Tag, User, VoteTarget } from "../types";
+import { Comment, FeedSort, Post, Tag, User, VoteTarget } from "../types";
 
 export async function listTags(): Promise<Tag[]> {
   const rows = await prisma.tag.findMany({
@@ -205,6 +206,46 @@ async function userVotesForPosts(
 
   return m;
 }
+
+async function batchCommentScores(
+  commentIds: string[],
+): Promise<Map<string, number>> {
+  if (commentIds.length === 0) return new Map();
+  const rows = await prisma.vote.groupBy({
+    by: ["targetId"],
+    where: {
+      targetType: "comment",
+      targetId: { in: commentIds },
+    },
+    _sum: { value: true },
+  });
+  const m = new Map<string, number>();
+  for (const r of rows) {
+    m.set(r.targetId, Number(r._sum.value ?? 0));
+  }
+  return m;
+}
+
+async function batchUserVotesForComments(
+  userId: string,
+  commentIds: string[],
+): Promise<Map<string, -1 | 0 | 1>> {
+  const m = new Map<string, -1 | 0 | 1>();
+  if (commentIds.length === 0) return m;
+  const rows = await prisma.vote.findMany({
+    where: {
+      userId,
+      targetType: "comment",
+      targetId: { in: commentIds },
+    },
+  });
+  for (const r of rows) {
+    const v = r.value;
+    m.set(r.targetId, v === -1 || v === 1 ? v : 0);
+  }
+  return m;
+}
+
 function mapPostRow(
   row: PostModel,
   tagSlugs: string[],
@@ -259,37 +300,49 @@ export async function getAuthorById(authorId: string): Promise<User>{
   : {id: authorId, username: `user_${authorId.slice(0,6)}`};
 }
 
-// export async function getCommentTree(
-//   postId: string,
-//   sessionUserId?: string,
-// ): Promise<EnrichedCommentNode[]> {
-//   const flat = await listCommentsForPost(postId);
-//   if (flat.length === 0) return [];
-//   const authorIds = [...new Set(flat.map((c) => c.authorId))];
-//   const authorMap = await batchAuthorsForIds(authorIds);
+export async function getCommentTree(
+  postId: string,
+  sessionUserId?: string,
+): Promise<EnrichedCommentNode[]> {
+  const flat = await listCommentsForPost(postId);
+  if (flat.length === 0) return [];
+  const authorIds = [...new Set(flat.map((c) => c.authorId))];
+  const authorMap = await batchAuthorIds(authorIds);
 
-//   const commentIds = flat.map((c) => c.id);
-//   const scoreMap = await batchCommentScores(commentIds);
-//   const voteMap = sessionUserId
-//     ? await batchUserVotesForComments(sessionUserId, commentIds)
-//     : new Map<string, -1 | 0 | 1>();
+  const commentIds = flat.map((c) => c.id);
+  const scoreMap = await batchCommentScores(commentIds);
+  const voteMap = sessionUserId
+    ? await batchUserVotesForComments(sessionUserId, commentIds)
+    : new Map<string, -1 | 0 | 1>();
 
-//   const enriched = flat
-//     .map((c) => {
-//       const author = authorMap.get(c.authorId);
-//       if (!author) return null;
+  const enriched = flat
+    .map((c) => {
+      const author = authorMap.get(c.authorId);
+      if (!author) return null;
 
-//       return {
-//         ...c,
-//         author,
-//         score: scoreMap.get(c.id) ?? 0,
-//         userVote: (voteMap.get(c.id) ?? 0) as -1 | 0 | 1,
-//       };
-//     })
-//     .filter((x): x is NonNullable<typeof x> => x !== null);
+      return {
+        ...c,
+        author,
+        score: scoreMap.get(c.id) ?? 0,
+        userVote: (voteMap.get(c.id) ?? 0) as -1 | 0 | 1,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
 
-//   return nestCommentRows(enriched);
-// }
+  return nestCommentRows(enriched);
+}
+
+export async function listCommentsForPost(postId: string): Promise<Comment[]> {
+  const rows = await prisma.comment.findMany({ where: { postId } });
+  return rows.map((c) => ({
+    id: c.id,
+    postId: c.postId,
+    authorId: c.authorId,
+    parentId: c.parentId,
+    body: c.body,
+    createdAt: c.createdAt.toISOString(),
+  }));
+}
 
 export async function getPostScore(postId: string): Promise<number> {
   const agg = await prisma.vote.aggregate({
