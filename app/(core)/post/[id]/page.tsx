@@ -1,5 +1,6 @@
 // import { CommentThread } from "@/components/post/comment-thread";
 import { VoteButtons } from "@/components/feed/vote-button";
+import { CommentThread } from "@/components/post/comment-thread";
 import { CommentComposer } from "@/components/post/post-composer";
 import { Separator } from "@/components/ui/separator";
 import { getSessionUser } from "@/lib/auth";
@@ -126,11 +127,11 @@ export default async function PostPage({
             </p>
           )}
 
-          {/* <CommentThread
+          <CommentThread
             tree={commentTree}
             postAuthorId={post.authorId}
             sessionUser={sessionUser}
-          /> */}
+          />
         </section>
       </div>
     </div>
