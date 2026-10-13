@@ -1,5 +1,6 @@
 "use client";
 
+import { voteCommentAction } from "@/lib/actions/comment";
 import { votePostAction } from "@/lib/actions/post";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -23,12 +24,14 @@ export function VoteButtons({
   const router = useRouter();
   const isPost = target === "post";
   function vote(value: -1 | 1) {
-    if (isPost) {
-      startTransition(async () => {
+    startTransition(async () => {
+      if (isPost) {
         await votePostAction(targetId, value);
-      });
+      } else {
+        await voteCommentAction(targetId, value);
+      }
       router.refresh();
-    }
+    });
   }
 
   const iconClass = isPost ? "size-6" : "size-4";
@@ -52,20 +55,19 @@ export function VoteButtons({
         )}
         aria-label={isPost ? "Upvote" : "Upvote comment"}
       >
-        <ChevronUp className={iconClass}/>
+        <ChevronUp className={iconClass} />
       </button>
       <span
-       className={cn(
-        scoreClass,
-        userVote === 1 && "text-upvote",
-        userVote === -1 && "text-downvote"
-       )}
-      >{score}</span>
-      <button 
-            onClick={() => vote(-1)}
-            disabled={pending}
-        >
-        <ChevronDown className={iconClass}/>
+        className={cn(
+          scoreClass,
+          userVote === 1 && "text-upvote",
+          userVote === -1 && "text-downvote",
+        )}
+      >
+        {score}
+      </span>
+      <button onClick={() => vote(-1)} disabled={pending}>
+        <ChevronDown className={iconClass} />
       </button>
     </div>
   );
